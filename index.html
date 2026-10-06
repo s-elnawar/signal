@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Signal: request triage for account managers</title>
+<meta name="description" content="Signal ranks client and internal requests so account managers always know what to work on next.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Requests</h1>
+      <p class="sub" id="sub">Loading your requests…</p>
+    </div>
+    <div class="top-acts">
+      <button class="btn" id="updateBtn" hidden>Write my update</button>
+      <button class="btn" id="pasteBtn" hidden>Paste a message</button>
+      <button class="btn" id="settingsBtn">Settings</button>
+      <button class="btn primary" id="addBtn">Add request</button>
+    </div>
+  </header>
+  <nav class="nav" aria-label="Views">
+    <button data-view="queue" aria-current="page">Queue</button>
+    <button data-view="waiting">Waiting<span class="count" id="cWaiting"></span></button>
+    <button data-view="done">Done</button>
+    <button data-view="clients">Clients</button>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<!-- request dialog -->
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <div class="dlg-body">
+    <h3 id="dlgTitle">Add request</h3>
+    <div class="field">
+      <label for="fTitle">What's the request?</label>
+      <input id="fTitle" autocomplete="off" placeholder="e.g. Send renewal pricing to Acme">
+      <p class="err" id="titleErr" hidden>Add a short description of the request.</p>
+    </div>
+    <div class="field">
+      <label for="fDetails">Details <span class="opt">(optional)</span></label>
+      <textarea id="fDetails" rows="2"></textarea>
+    </div>
+    <fieldset class="seg"><legend>Who's it from?</legend><div class="opts">
+      <label><input type="radio" name="source" value="client"><span>Client</span></label>
+      <label><input type="radio" name="source" value="internal"><span>Internal</span></label>
+    </div></fieldset>
+    <div class="two">
+      <div class="field" id="gClient"><label for="fClient" id="clientLbl">Client account</label><input id="fClient" list="clientList" autocomplete="off" placeholder="Company name"><datalist id="clientList"></datalist></div>
+      <div class="field"><label for="fWho" id="whoLbl">Contact</label><input id="fWho" autocomplete="off" placeholder="Name"></div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="fRole">Role or title <span class="opt">(optional)</span></label><input id="fRole" autocomplete="off" placeholder="e.g. Head of Treasury Operations"></div>
+      <div class="field"><label for="fAsked">Requested on</label><input id="fAsked" type="datetime-local"></div>
+    </div>
+
+    <fieldset class="seg" id="gMood"><legend>How's the client feeling?</legend><div class="opts">
+      <label><input type="radio" name="mood" value="happy"><span>Happy</span></label>
+      <label><input type="radio" name="mood" value="unhappy"><span>Unhappy</span></label>
+    </div></fieldset>
+    <fieldset class="seg" id="gSeniority"><legend>Who asked internally?</legend><div class="opts">
+      <label><input type="radio" name="seniority" value="senior"><span>Manager, senior stakeholder or CEO</span></label>
+      <label><input type="radio" name="seniority" value="peer"><span>Colleague</span></label>
+    </div></fieldset>
+    <fieldset class="seg"><legend>How much work is it?</legend><div class="opts" id="effortOpts">
+      <label><input type="radio" name="complexity" value="quick"><span>Quick</span></label>
+      <label><input type="radio" name="complexity" value="moderate"><span>Moderate</span></label>
+      <label><input type="radio" name="complexity" value="complex"><span>Complex and long</span></label>
+    </div></fieldset>
+    <div class="field"><label for="fEst">Time estimate in hours</label><input id="fEst" type="number" min="0.25" step="0.25" inputmode="decimal"></div>
+    <fieldset class="seg"><legend>What's it for?</legend><div class="opts">
+      <label><input type="radio" name="value" value="revenue"><span>Revenue generating</span></label>
+      <label><input type="radio" name="value" value="retention"><span>Retention</span></label>
+      <label><input type="radio" name="value" value="leadership"><span>Internal, for leadership</span></label>
+      <label><input type="radio" name="value" value="colleague"><span>Internal, for a colleague</span></label>
+    </div></fieldset>
+    <fieldset class="seg" id="gUrgency"><legend>When is it needed?</legend><div class="opts">
+      <label><input type="radio" name="urgency" value="today"><span>Now or today</span></label>
+      <label><input type="radio" name="urgency" value="week"><span>End of the week</span></label>
+      <label><input type="radio" name="urgency" value="anytime"><span>Whenever there's time</span></label>
+    </div></fieldset>
+    <p class="note" id="clientNote">Client requests are due within 48 hours unless you set a specific deadline below.</p>
+    <div class="two">
+      <div class="field"><label for="fDue">Specific deadline <span class="opt">(optional)</span></label><input id="fDue" type="date"></div>
+      <div class="field"><label for="fDueTime">Deadline time</label><input id="fDueTime" type="time" value="17:00"></div>
+    </div>
+    <label class="check" id="gAck"><input type="checkbox" id="fAck"><span>I've replied to let them know I'm on it</span></label>
+
+    <fieldset class="seg"><legend>Status</legend><div class="opts">
+      <label><input type="radio" name="status" value="open"><span>Open</span></label>
+      <label><input type="radio" name="status" value="waiting"><span>Waiting on someone</span></label>
+      <label><input type="radio" name="status" value="done"><span>Done</span></label>
+    </div></fieldset>
+    <div class="two" id="gWaiting">
+      <div class="field"><label for="fWaitOn">Waiting on</label><input id="fWaitOn" autocomplete="off" placeholder="e.g. Finance, the client"></div>
+      <div class="field"><label for="fFollow">Follow up on</label><input id="fFollow" type="date"></div>
+    </div>
+
+    <div class="preview" id="preview" aria-live="polite"></div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn danger" id="delBtn" hidden>Delete</button>
+    <span class="spacer"></span>
+    <button class="btn" id="cancelBtn">Cancel</button>
+    <button class="btn primary" id="saveBtn">Save request</button>
+  </div>
+</dialog>
+
+<!-- paste dialog -->
+<dialog id="pasteDlg" aria-labelledby="pasteTitle">
+  <div class="dlg-body">
+    <h3 id="pasteTitle">Paste a message</h3>
+    <p class="muted" style="margin:-6px 0 14px">Paste an email, Slack or Teams message. Claude reads it and fills in the request for you to check before saving.</p>
+    <label for="pasteText" class="muted" style="display:block;font-size:13.5px;margin-bottom:6px">Message</label>
+    <textarea id="pasteText" rows="8"></textarea>
+    <p class="status-line" id="pasteStatus" role="status"></p>
+  </div>
+  <div class="dlg-foot">
+    <span class="spacer"></span>
+    <button class="btn" id="pasteCancel">Cancel</button>
+    <button class="btn primary" id="pasteGo">Read message</button>
+  </div>
+</dialog>
+
+<!-- settings dialog -->
+<dialog id="setDlg" aria-labelledby="setTitle">
+  <div class="dlg-body">
+    <h3 id="setTitle">Settings</h3>
+    <div class="two">
+      <div class="field"><label for="sHours">Focus hours per day</label><input id="sHours" type="number" min="1" max="12" step="0.5"></div>
+      <div class="field"><label for="sAck">Reply to clients within (hours)</label><input id="sAck" type="number" min="0.5" max="48" step="0.5"></div>
+      <div class="field"><label for="sArr">Key account ARR from (£)</label><input id="sArr" type="number" min="0" step="1000"></div>
+      <div class="field"><label for="sRenew">Renewal window (days)</label><input id="sRenew" type="number" min="1" max="365" step="1"></div>
+    </div>
+    <fieldset class="seg"><legend>Effort scoring</legend><div class="opts">
+      <label><input type="radio" name="effortMode" value="complexFirst"><span>Bigger tasks score higher</span></label>
+      <label><input type="radio" name="effortMode" value="quickFirst"><span>Quick wins score higher</span></label>
+    </div></fieldset>
+    <h5>Factor weights</h5>
+    <p class="note" style="margin:0 0 10px">1 is your original system. Raise a factor to make it count more in the ranking, lower it to count less.</p>
+    <div class="weights" id="weights"></div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn" id="setReset">Reset to defaults</button>
+    <span class="spacer"></span>
+    <button class="btn" id="setCancel">Cancel</button>
+    <button class="btn primary" id="setSave">Save settings</button>
+  </div>
+</dialog>
+
+<!-- client dialog -->
+<dialog id="cliDlg" aria-labelledby="cliTitle">
+  <div class="dlg-body">
+    <h3 id="cliTitle">Client</h3>
+    <div class="field"><label for="cName">Company name</label><input id="cName" autocomplete="off"><p class="err" id="cNameErr" hidden>Add the company name.</p></div>
+    <div class="two">
+      <div class="field"><label for="cArr">ARR (£)</label><input id="cArr" type="number" min="0" step="1000" inputmode="numeric"></div>
+      <div class="field"><label for="cRenew">Renewal date</label><input id="cRenew" type="date"></div>
+      <div class="field"><label for="cHealth">Health score <span class="opt">(0 to 100)</span></label><input id="cHealth" type="number" min="0" max="100" step="1" inputmode="numeric"></div>
+    </div>
+    <div id="cHistWrap">
+      <h5>Request history</h5>
+      <ul class="hist" id="cHist"></ul>
+      <div id="cAiWrap" hidden>
+        <h5>Account summary</h5>
+        <p class="muted" style="font-size:13.5px;margin:0">For QBRs and renewal conversations. Claude summarises what you've delivered, open issues and talking points.</p>
+        <button class="btn sm" id="cAiGo" style="margin-top:10px">Summarise this account</button>
+        <div class="ai-out" id="cAiOut" hidden></div>
+        <p class="status-line" id="cAiStatus" role="status"></p>
+      </div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn danger" id="cDel" hidden>Delete client</button>
+    <span class="spacer"></span>
+    <button class="btn" id="cCancel">Cancel</button>
+    <button class="btn primary" id="cSave">Save client</button>
+  </div>
+</dialog>
+
+<!-- update dialog -->
+<dialog id="updDlg" aria-labelledby="updTitle">
+  <div class="dlg-body">
+    <h3 id="updTitle">Write my update</h3>
+    <fieldset class="seg"><legend>Covering</legend><div class="opts">
+      <label><input type="radio" name="period" value="day" checked><span>Today</span></label>
+      <label><input type="radio" name="period" value="week"><span>This week</span></label>
+    </div></fieldset>
+    <p class="muted" style="font-size:13.5px;margin:0">A short update for your manager, built from what you finished, what's next and what you're waiting on.</p>
+    <div class="ai-out" id="updOut" hidden></div>
+    <p class="status-line" id="updStatus" role="status"></p>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn" id="updCopy" hidden>Copy</button>
+    <span class="spacer"></span>
+    <button class="btn" id="updClose">Close</button>
+    <button class="btn primary" id="updGo">Write update</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="assets/js/app.js"></script>
+</body>
+</html>
